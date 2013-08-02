@@ -34,8 +34,8 @@
 %%
 %% @end
 connect(Host, PortNo, Login, Passcode)  ->
-    Message = lists:append(["CONNECT", "\nlogin: ", Login, "\npasscode: ",
-                            Passcode, "\n\n", [0]]),
+    Message = ["CONNECT", "\nlogin: ", Login, "\npasscode: ", Passcode,
+               "\n\n", [0]],
     {ok, Sock} = gen_tcp:connect(Host, PortNo, [{active, false}]),
     gen_tcp:send(Sock, Message),
     {ok, Response} = gen_tcp:recv(Sock, 0),
@@ -66,8 +66,8 @@ subscribe(Destination, Connection) ->
 %%
 %% @end
 subscribe(Destination, Connection, Options) ->
-    Message = lists:append(["SUBSCRIBE", "\ndestination: ", Destination,
-                            concatenate_options(Options), "\n\n", [0]]),
+    Message = ["SUBSCRIBE", "\ndestination: ", Destination,
+               concatenate_options(Options), "\n\n", [0]],
     gen_tcp:send(Connection, Message),
     ok.
 
@@ -77,8 +77,7 @@ subscribe(Destination, Connection, Options) ->
 %%
 %% @end
 unsubscribe(Destination, Connection) ->
-    Message = lists:append(["UNSUBSCRIBE", "\ndestination: ", Destination,
-                            "\n\n", [0]]),
+    Message = ["UNSUBSCRIBE", "\ndestination: ", Destination, "\n\n", [0]],
     gen_tcp:send(Connection, Message),
     ok.
 
@@ -88,7 +87,7 @@ unsubscribe(Destination, Connection) ->
 %%
 %% @end
 disconnect(Connection) ->
-    Message = lists:append(["DISCONNECT", "\n\n", [0]]),
+    Message = ["DISCONNECT", "\n\n", [0]],
     gen_tcp:send(Connection, Message),
     gen_tcp:close(Connection),
     ok.
@@ -121,8 +120,7 @@ ack(Connection, [Type, Headers, Body]) ->
     MessageId = get_message_id([Type, Headers, Body]),
     ack(Connection, MessageId);
 ack(Connection, MessageId) ->
-    AckMessage = lists:append(["ACK", "\nmessage-id: ", MessageId,
-                               "\n\n", [0]]),
+    AckMessage = ["ACK", "\nmessage-id: ", MessageId, "\n\n", [0]],
     gen_tcp:send(Connection, AckMessage),
     ok.
 
@@ -138,8 +136,8 @@ ack(Connection, [Type, Headers, Body], TransactionId) ->
     MessageId = get_message_id([Type, Headers, Body]),
     ack(Connection, MessageId, TransactionId);
 ack(Connection, MessageId, TransactionId) ->
-    AckMessage = lists:append(["ACK", "\nmessage-id: ", MessageId,
-                               "\ntransaction: ", TransactionId, "\n\n", [0]]),
+    AckMessage = ["ACK", "\nmessage-id: ", MessageId,
+                  "\ntransaction: ", TransactionId, "\n\n", [0]],
     gen_tcp:send(Connection, AckMessage),
     ok.
 
@@ -151,9 +149,8 @@ ack(Connection, MessageId, TransactionId) ->
 %%
 %% @end
 send(Connection, Destination, Headers, MessageBody) ->
-    Message = lists:append(["SEND", "\ndestination: ", Destination,
-                            concatenate_options(Headers), "\n\n",
-                            MessageBody, [0]]),
+    Message = ["SEND", "\ndestination: ", Destination,
+               concatenate_options(Headers), "\n\n", MessageBody, [0]],
     gen_tcp:send(Connection, Message),
     ok.
 
@@ -176,9 +173,8 @@ get_messages(Connection, Messages, Response) ->
      {headers, Headers},
      {body, MessageBody}, TheRest] = get_message(Response),
     [_|T] = TheRest, %% U.G.L.Y.... you ain't got no alibi.
-    get_messages(Connection,
-                 lists:append(Messages, [[{type, Type}, {headers, Headers},
-                                          {body, MessageBody}]]), T).
+    get_messages(Connection, [Messages, [[{type, Type}, {headers, Headers},
+                                          {body, MessageBody}]]], T).
 
 %% @doc On message retrieval execute a function
 %%
@@ -200,8 +196,7 @@ on_message(F, Conn) ->
 %%
 %% @end
 begin_transaction(Connection, TransactionId) ->
-    Message = lists:append(["BEGIN", "\ntransaction: ", TransactionId,
-                            "\n\n", [0]]),
+    Message = ["BEGIN", "\ntransaction: ", TransactionId, "\n\n", [0]],
     gen_tcp:send(Connection, Message),
     ok.
 
@@ -212,8 +207,8 @@ begin_transaction(Connection, TransactionId) ->
 %%
 %% @end
 commit_transaction(Connection, TransactionId) ->
-    Message = lists:append(["COMMIT", "\ntransaction: ", TransactionId,
-                            "\n\n", [0]]),
+    Message = ["COMMIT", "\ntransaction: ", TransactionId,
+               "\n\n", [0]],
     gen_tcp:send(Connection, Message),
     ok.
 
@@ -224,8 +219,8 @@ commit_transaction(Connection, TransactionId) ->
 %%
 %% @end
 abort_transaction(Connection, TransactionId) ->
-    Message = lists:append(["ABORT", "\ntransaction: ", TransactionId,
-                            "\n\n", [0]]),
+    Message = ["ABORT", "\ntransaction: ", TransactionId,
+               "\n\n", [0]],
     gen_tcp:send(Connection, Message),
     ok.
 
@@ -234,7 +229,7 @@ concatenate_options([]) ->
     [];
 concatenate_options([H|T]) ->
     {Name, Value} = H,
-    lists:append(["\n", Name, ": ", Value, concatenate_options(T)]).
+    ["\n", Name, ": ", Value, concatenate_options(T)].
 
 apply_function_to_messages(_, []) ->
     ok;
@@ -263,7 +258,7 @@ get_message_body([H|T], MessageBody) ->
             {MessageBody, T};
         _ ->
             {MyMessageBody, TheRest} = get_message_body(T, MessageBody),
-            {lists:append([MessageBody, [H], MyMessageBody]), TheRest}
+            {[MessageBody, [H], MyMessageBody], TheRest}
     end.
 
 %% extract headers as a blob of chars, after having iterated over...
@@ -278,7 +273,7 @@ get_headers([H|T], Headers, LastChar) ->
             {MessageBody, TheRest} = get_message_body(T),
             [{Headers, MessageBody}, TheRest];
         {_, _} ->
-            get_headers(T, lists:append([Headers, [H]]), H)
+            get_headers(T, [Headers, [H]], H)
     end.
 
 %% extract type("MESSAGE", "CONNECT", etc.) from message string...
@@ -293,7 +288,7 @@ get_type([H|T], Type) ->
             [{Headers, MessageBody}, TheRest] = get_headers(T),
             [Type, {Headers, MessageBody}, TheRest];
         _ ->
-            get_type(T, lists:append([Type, [H]]))
+            get_type(T, [Type, [H]])
     end.
 
 %% parse header clob into list of tuples...
@@ -301,7 +296,7 @@ get_headers_from_raw_src(Headers, []) ->
     {Headers, []};
 get_headers_from_raw_src(Headers, RawSrc) ->
     {Header, RestOfList} = get_header(RawSrc),
-    get_headers_from_raw_src(lists:append([Headers, [Header]]), RestOfList).
+    get_headers_from_raw_src([Headers, [Header]], RestOfList).
 
 get_header(RawSrc) ->
     {HeaderName, RestOfListAfterHeaderExtraction} =
@@ -315,7 +310,7 @@ get_header_name(HeaderName, [H|T]) ->
         58 ->
             {HeaderName, T};
         _ ->
-            get_header_name(lists:append([HeaderName, [H]]), T)
+            get_header_name([HeaderName, [H]], T)
     end.
 
 get_header_value(HeaderValue, [H|T]) ->
@@ -323,5 +318,5 @@ get_header_value(HeaderValue, [H|T]) ->
         10 ->
             {HeaderValue, T};
         _ ->
-            get_header_value(lists:append([HeaderValue, [H]]), T)
+            get_header_value([HeaderValue, [H]], T)
     end.
