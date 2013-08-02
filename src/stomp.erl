@@ -36,14 +36,14 @@
 connect(Host, PortNo, Login, Passcode)  ->
     Message = ["CONNECT", "\nlogin: ", Login, "\npasscode: ", Passcode,
                "\n\n", [0]],
-    {ok, Sock} = gen_tcp:connect(Host, PortNo, [{active, false}]),
+    {ok, Sock} = gen_tcp:connect(Host, PortNo, [binary, {active, false}]),
     gen_tcp:send(Sock, Message),
     {ok, Response} = gen_tcp:recv(Sock, 0),
-    [{type, Type}, _, _, _] = get_message(Response), %%UGLY!
+    [{type, Type}, _, _, _] = parse_message(Response),
     case Type of
-        "CONNECTED" ->
+        <<"CONNECTED">> ->
             Sock;
-        _->
+        _ ->
             throw("Error occured during connection attempt.")
     end,
     Sock.
@@ -320,3 +320,34 @@ get_header_value(HeaderValue, [H|T]) ->
         _ ->
             get_header_value([HeaderValue, [H]], T)
     end.
+
+%%
+%% New message parsing
+%% (see http://stomp.github.io/stomp-specification-1.2.html)
+%%
+
+parse_message(<<"CONNECTED", Headers/bytes>>) ->
+    [{type, <<"CONNECTED">>},
+     {headers, parse_headers(lstrip_eol(Headers))},
+     {body, <<>>}];
+parse_message(<<"MESSAGE", HeadersAndBody/bytes>>) ->
+    parse_headers_and_body(lstrip_eol(HeadersAndBody),
+                           [{type, <<"MESSAGE">>}]);
+parse_message(<<"RECEIPT", Headers/bytes>>) ->
+    [{type, <<"RECEIPT">>},
+     {headers, parse_headers(lstrip_eol(Headers))},
+     {body, <<>>}];
+parse_message(<<"ERROR", HeadersAndBody/bytes>>) ->
+    parse_headers_and_body(lstrip_eol(HeadersAndBody),
+                           [{type, <<"ERROR">>}]).
+
+parse_headers(<<"content-length", Rest/bytes>>) ->
+    unimplemented.
+
+parse_headers_and_body(HeadersAndBody, Message) ->
+    Message.
+
+lstrip_eol(<<"\r\n", Rest/bytes>>) ->
+    Rest;
+lstrip_eol(<<"\n", Rest/bytes>>) ->
+    Rest.
