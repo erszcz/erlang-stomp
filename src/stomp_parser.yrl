@@ -1,5 +1,5 @@
 Nonterminals
-frame_stream frame headers header.
+frame_stream frame headers header header_value.
 
 Terminals
 ':' eol command octets null.
@@ -25,13 +25,18 @@ frame -> eol : [].
 headers -> header headers : ['$1'|'$2'].
 headers -> header : ['$1'].
 
-header -> octets ':' octets eol : {unwrap('$1'), unwrap('$3')}.
-header -> octets ':' eol : {unwrap('$1'), unwrap("")}.
+header -> octets header_value : {unwrap('$1'), '$2'}.
+
+header_value -> ':' octets header_value : unwrap('$2') ++ [$:|'$3'].
+header_value -> ':' octets eol : unwrap('$2').
+header_value -> ':' eol : "".
 
 Erlang code.
 
 strip_eol_frame([], Frames) ->
     Frames;
+strip_eol_frame(Frame, [[]]) ->
+    [Frame];
 strip_eol_frame(Frame, Frames) ->
     [Frame | Frames].
 

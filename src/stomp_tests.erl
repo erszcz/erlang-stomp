@@ -47,7 +47,13 @@ parser_test() ->
                             {"message-id", "007"},
                             {"destination", "/queue/a"},
                             {"content-type", "text/plain"}]},
-                 {body, "hello queue a"}]],
+                 {body, "hello queue a"}],
+                [{type, "CONNECTED"},
+                 {headers, [{"heart-beat","0,0"},
+                            {"session","ID:x3.local-62967-1375797541911-2:15"},
+                            {"server","ActiveMQ/5.8.0"},
+                            {"version","1.0"}]},
+                 {body, ""}]],
     ?assertEqual(Expected, ParseTree).
 
 messages() ->
