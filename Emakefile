@@ -5,4 +5,7 @@
 %% @end
 %% --------------------------
 {'src/*',
-    [debug_info,{outdir,"ebin"},{i,'include'}]}.
+ [debug_info,
+  {outdir,"ebin"},
+  {i, ['include',
+       'src']}]}.

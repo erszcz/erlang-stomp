@@ -7,7 +7,10 @@
 %% --------------------------
 
 -module(stomp_tests).
+
 -include_lib("eunit/include/eunit.hrl").
+
+-include("stomp.hrl").
 
 %% Exports for easy shell access
 -export([messages/0,

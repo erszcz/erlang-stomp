@@ -4,7 +4,7 @@ all: src/stomp_lexer.erl src/stomp_parser.erl
 	@mkdir -p ebin/
 	@erl -make
 
-	@erlc 	-Iebin/ \
+	@erlc -Iebin -Isrc \
 		-o ebin \
 		src/*.erl
 

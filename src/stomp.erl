@@ -28,8 +28,7 @@
          abort_transaction/2,
          on_message/2]).
 
--record(stomp_conn, {socket,
-                     chars = []}).
+-include("stomp.hrl").
 
 %% @doc Connect to a STOMP server and return a connection socket
 %%
