@@ -22,11 +22,11 @@ frame -> command eol
                  {body, []}].
 frame -> eol : [].
 
-headers -> header eol headers : ['$1'|'$2'].
-headers -> header eol : ['$1'].
+headers -> header headers : ['$1'|'$2'].
+headers -> header : ['$1'].
 
-header -> header_chars ':' header_chars : {unwrap('$1'), unwrap('$3')}.
-header -> header_chars ':' : {unwrap('$1'), unwrap("")}.
+header -> header_chars ':' header_chars eol : {unwrap('$1'), unwrap('$3')}.
+header -> header_chars ':' eol : {unwrap('$1'), unwrap("")}.
 
 Erlang code.
 
