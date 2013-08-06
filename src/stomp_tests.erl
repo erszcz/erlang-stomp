@@ -31,3 +31,22 @@ basic_send_test() ->
     ?assert(ok == stomp:send(Conn, "/queue/foobar", [], "hello world")),
     stomp:disconnect(Conn).
 
+%% @doc Test parsing a few consecutive messages
+%% @end
+parser_test() ->
+    {ok, Tokens, _EndLine} = stomp_lexer:string(messages()),
+    {ok, ParseTree} = stomp_parser:parse(Tokens),
+    Expected = [[{type, "CONNECTED"},
+                 {headers, [{"version","1.2"}]},
+                 {body, ""}],
+                [{type, "MESSAGE"},
+                 {headers, [{"subscription", "0"},
+                            {"message-id", "007"},
+                            {"destination", "/queue/a"},
+                            {"content-type", "text/plain"}]},
+                 {body, "hello queue a"}]],
+    ?assertEqual(Expected, ParseTree).
+
+messages() ->
+    {ok, BContents} = file:read_file("stomp.txt"),
+    binary_to_list(BContents).
