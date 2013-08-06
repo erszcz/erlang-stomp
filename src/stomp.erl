@@ -42,7 +42,7 @@ connect(Host, PortNo, Login, Passcode)  ->
     gen_tcp:send(Sock, Message),
     {[[{type, Type}, _, _]], Conn} = parse_messages(#stomp_conn{socket = Sock}),
     case Type of
-        <<"CONNECTED">> ->
+        "CONNECTED" ->
             Sock;
         _ ->
             throw("Error occured during connection attempt.")
