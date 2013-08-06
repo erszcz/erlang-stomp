@@ -9,6 +9,9 @@
 -module(stomp_tests).
 -include_lib("eunit/include/eunit.hrl").
 
+%% Exports for easy shell access
+-export([messages/0,
+         read/1]).
 
 %% @doc Test connecting
 %% @end
@@ -48,5 +51,8 @@ parser_test() ->
     ?assertEqual(Expected, ParseTree).
 
 messages() ->
-    {ok, BContents} = file:read_file("stomp.txt"),
+    read("stomp.txt").
+
+read(Filename) ->
+    {ok, BContents} = file:read_file(Filename),
     binary_to_list(BContents).
