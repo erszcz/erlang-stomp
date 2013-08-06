@@ -2,7 +2,7 @@ Nonterminals
 frame_stream frame headers header.
 
 Terminals
-':' eol command octets header_chars null.
+':' eol command octets null.
 
 Rootsymbol frame_stream.
 
@@ -25,8 +25,8 @@ frame -> eol : [].
 headers -> header headers : ['$1'|'$2'].
 headers -> header : ['$1'].
 
-header -> header_chars ':' header_chars eol : {unwrap('$1'), unwrap('$3')}.
-header -> header_chars ':' eol : {unwrap('$1'), unwrap("")}.
+header -> octets ':' octets eol : {unwrap('$1'), unwrap('$3')}.
+header -> octets ':' eol : {unwrap('$1'), unwrap("")}.
 
 Erlang code.
 
@@ -37,7 +37,5 @@ strip_eol_frame(Frame, Frames) ->
 
 unwrap({command, _, Command}) ->
     Command;
-unwrap({header_chars, _, Chars}) ->
-    Chars;
 unwrap({octets, _, Octets}) ->
     Octets.
