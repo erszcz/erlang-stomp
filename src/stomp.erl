@@ -28,6 +28,9 @@
          abort_transaction/2,
          on_message/2]).
 
+-record(stomp_conn, {socket,
+                     chars = []}).
+
 %% @doc Connect to a STOMP server and return a connection socket
 %%
 %% Example: Conn = stomp:connect("localhost", 61613, "", "").
@@ -36,17 +39,16 @@
 connect(Host, PortNo, Login, Passcode)  ->
     Message = ["CONNECT", "\nlogin: ", Login, "\npasscode: ", Passcode,
                "\n\n", [0]],
-    {ok, Sock} = gen_tcp:connect(Host, PortNo, [binary, {active, false}]),
+    {ok, Sock} = gen_tcp:connect(Host, PortNo, [{active, false}]),
     gen_tcp:send(Sock, Message),
-    {ok, Response} = gen_tcp:recv(Sock, 0),
-    [{type, Type}, _, _, _] = parse_message(Response),
+    {[[{type, Type}, _, _]], Conn} = parse_messages(#stomp_conn{socket = Sock}),
     case Type of
         <<"CONNECTED">> ->
             Sock;
         _ ->
             throw("Error occured during connection attempt.")
     end,
-    Sock.
+    Conn.
 
 %% @doc Subscribe to a named queue
 %%
@@ -326,28 +328,35 @@ get_header_value(HeaderValue, [H|T]) ->
 %% (see http://stomp.github.io/stomp-specification-1.2.html)
 %%
 
-parse_message(<<"CONNECTED", Headers/bytes>>) ->
-    [{type, <<"CONNECTED">>},
-     {headers, parse_headers(lstrip_eol(Headers))},
-     {body, <<>>}];
-parse_message(<<"MESSAGE", HeadersAndBody/bytes>>) ->
-    parse_headers_and_body(lstrip_eol(HeadersAndBody),
-                           [{type, <<"MESSAGE">>}]);
-parse_message(<<"RECEIPT", Headers/bytes>>) ->
-    [{type, <<"RECEIPT">>},
-     {headers, parse_headers(lstrip_eol(Headers))},
-     {body, <<>>}];
-parse_message(<<"ERROR", HeadersAndBody/bytes>>) ->
-    parse_headers_and_body(lstrip_eol(HeadersAndBody),
-                           [{type, <<"ERROR">>}]).
+parse_messages(Conn) ->
+    case get_tokens(Conn) of
+        {eof, NewConn} ->
+            {[], NewConn};
+        {Tokens, NewConn} ->
+            {ok, Messages} = stomp_parser:parse(Tokens),
+            {Messages, NewConn}
+    end.
 
-parse_headers(<<"content-length", Rest/bytes>>) ->
-    unimplemented.
+get_tokens(#stomp_conn{chars = Chars} = Conn) ->
+    more_tokens(clear_chars(Conn),
+                stomp_lexer:tokens([], Chars)).
 
-parse_headers_and_body(HeadersAndBody, Message) ->
-    Message.
+get_tokens(Cont, Chars, Conn) ->
+    more_tokens(clear_chars(Conn),
+                stomp_lexer:tokens(Cont, Chars)).
 
-lstrip_eol(<<"\r\n", Rest/bytes>>) ->
-    Rest;
-lstrip_eol(<<"\n", Rest/bytes>>) ->
-    Rest.
+more_tokens(#stomp_conn{socket = Socket} = Conn, {more, Cont}) ->
+    {ok, Chars} = gen_tcp:recv(Socket, 0),
+    get_tokens(Cont, Chars, Conn);
+more_tokens(Conn, {done, {ok, Tokens, _}, RestChars}) ->
+    {Tokens, set_chars(Conn, RestChars)};
+more_tokens(Conn, {done, {eof, _}, RestChars}) ->
+    {eof, set_chars(Conn, RestChars)};
+more_tokens(Conn, {done, ErrorInfo, RestChars}) ->
+    error({ErrorInfo, set_chars(Conn, RestChars)}).
+
+set_chars(#stomp_conn{} = Conn, Chars) ->
+    Conn#stomp_conn{chars = Chars}.
+
+clear_chars(#stomp_conn{} = Conn) ->
+    set_chars(Conn, []).
