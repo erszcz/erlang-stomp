@@ -20,7 +20,7 @@
 %% @end
 basic_connection_test() ->
     Conn = stomp:connect("localhost", 61613, "", ""),
-    ?assert(is_port(Conn)),
+    ?assert(is_port(Conn#stomp_conn.socket)),
     stomp:disconnect(Conn).
 
 %% @doc Test subscribing

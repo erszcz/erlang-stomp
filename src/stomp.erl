@@ -66,10 +66,10 @@ subscribe(Destination, Connection) ->
 %%                           {"activemq.prefetchSize", 1}]).
 %%
 %% @end
-subscribe(Destination, Connection, Options) ->
+subscribe(Destination, #stomp_conn{socket = Socket}, Options) ->
     Message = ["SUBSCRIBE", "\ndestination: ", Destination,
                concatenate_options(Options), "\n\n", [0]],
-    gen_tcp:send(Connection, Message),
+    gen_tcp:send(Socket, Message),
     ok.
 
 %% @doc Remove an existing subscription
@@ -77,9 +77,9 @@ subscribe(Destination, Connection, Options) ->
 %% Example: stomp:unsubscribe("/queue/foobar", Conn).
 %%
 %% @end
-unsubscribe(Destination, Connection) ->
+unsubscribe(Destination, #stomp_conn{socket = Socket}) ->
     Message = ["UNSUBSCRIBE", "\ndestination: ", Destination, "\n\n", [0]],
-    gen_tcp:send(Connection, Message),
+    gen_tcp:send(Socket, Message),
     ok.
 
 %% @doc Disconnect gracefully from the existing connection
@@ -87,10 +87,10 @@ unsubscribe(Destination, Connection) ->
 %% Example: stomp:disconnect(Conn).
 %%
 %% @end
-disconnect(Connection) ->
+disconnect(#stomp_conn{socket = Socket}) ->
     Message = ["DISCONNECT", "\n\n", [0]],
-    gen_tcp:send(Connection, Message),
-    gen_tcp:close(Connection),
+    gen_tcp:send(Socket, Message),
+    gen_tcp:close(Socket),
     ok.
 
 %% @doc Get a particular message ID
@@ -120,9 +120,9 @@ get_message_id([]) ->
 ack(Connection, [Type, Headers, Body]) ->
     MessageId = get_message_id([Type, Headers, Body]),
     ack(Connection, MessageId);
-ack(Connection, MessageId) ->
+ack(#stomp_conn{socket = Socket}, MessageId) ->
     AckMessage = ["ACK", "\nmessage-id: ", MessageId, "\n\n", [0]],
-    gen_tcp:send(Connection, AckMessage),
+    gen_tcp:send(Socket, AckMessage),
     ok.
 
 %% @doc Acknowledge consumption of a message
@@ -136,10 +136,10 @@ ack(Connection, MessageId) ->
 ack(Connection, [Type, Headers, Body], TransactionId) ->
     MessageId = get_message_id([Type, Headers, Body]),
     ack(Connection, MessageId, TransactionId);
-ack(Connection, MessageId, TransactionId) ->
+ack(#stomp_conn{socket = Socket}, MessageId, TransactionId) ->
     AckMessage = ["ACK", "\nmessage-id: ", MessageId,
                   "\ntransaction: ", TransactionId, "\n\n", [0]],
-    gen_tcp:send(Connection, AckMessage),
+    gen_tcp:send(Socket, AckMessage),
     ok.
 
 %% @doc Send a message to the destination in the messaging system
@@ -149,10 +149,10 @@ ack(Connection, MessageId, TransactionId) ->
 %%                     "high priority hello world").
 %%
 %% @end
-send(Connection, Destination, Headers, MessageBody) ->
+send(#stomp_conn{socket = Socket}, Destination, Headers, MessageBody) ->
     Message = ["SEND", "\ndestination: ", Destination,
                concatenate_options(Headers), "\n\n", MessageBody, [0]],
-    gen_tcp:send(Connection, Message),
+    gen_tcp:send(Socket, Message),
     ok.
 
 %% @doc Retrieve messages destined for this client from the server.
@@ -163,8 +163,8 @@ send(Connection, Destination, Headers, MessageBody) ->
 get_messages(Connection) ->
     get_messages(Connection, []).
 
-get_messages(Connection, Messages) ->
-    {ok, Response} = gen_tcp:recv(Connection, 0),
+get_messages(#stomp_conn{socket = Socket} = Connection, Messages) ->
+    {ok, Response} = gen_tcp:recv(Socket, 0),
     get_messages(Connection, Messages, Response).
 
 get_messages(_, Messages, []) ->
@@ -196,9 +196,9 @@ on_message(F, Conn) ->
 %%              "MyUniqueTransactionIdBlahBlahBlah1234567890").
 %%
 %% @end
-begin_transaction(Connection, TransactionId) ->
+begin_transaction(#stomp_conn{socket = Socket}, TransactionId) ->
     Message = ["BEGIN", "\ntransaction: ", TransactionId, "\n\n", [0]],
-    gen_tcp:send(Connection, Message),
+    gen_tcp:send(Socket, Message),
     ok.
 
 %% @doc Commit a transaction
@@ -207,10 +207,10 @@ begin_transaction(Connection, TransactionId) ->
 %%              "MyUniqueTransactionIdBlahBlahBlah1234567890").
 %%
 %% @end
-commit_transaction(Connection, TransactionId) ->
+commit_transaction(#stomp_conn{socket = Socket}, TransactionId) ->
     Message = ["COMMIT", "\ntransaction: ", TransactionId,
                "\n\n", [0]],
-    gen_tcp:send(Connection, Message),
+    gen_tcp:send(Socket, Message),
     ok.
 
 %% @doc Abort a transaction
@@ -219,10 +219,10 @@ commit_transaction(Connection, TransactionId) ->
 %%              "MyUniqueTransactionIdBlahBlahBlah1234567890").
 %%
 %% @end
-abort_transaction(Connection, TransactionId) ->
+abort_transaction(#stomp_conn{socket = Socket}, TransactionId) ->
     Message = ["ABORT", "\ntransaction: ", TransactionId,
                "\n\n", [0]],
-    gen_tcp:send(Connection, Message),
+    gen_tcp:send(Socket, Message),
     ok.
 
 %% PRIVATE METHODS...
