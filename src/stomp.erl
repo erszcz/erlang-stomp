@@ -40,7 +40,7 @@ connect(Host, PortNo, Login, Passcode)  ->
                "\n\n", [0]],
     {ok, Sock} = gen_tcp:connect(Host, PortNo, [{active, false}]),
     gen_tcp:send(Sock, Message),
-    {[[{type, Type}, _, _]], Conn} = parse_messages(#stomp_conn{socket = Sock}),
+    {[[{type, Type}, _, _]], Conn} = get_messages(#stomp_conn{socket = Sock}),
     case Type of
         "CONNECTED" ->
             Sock;
@@ -160,22 +160,9 @@ send(#stomp_conn{socket = Socket}, Destination, Headers, MessageBody) ->
 %% Example: stomp:get_messages(Conn).
 %%
 %% @end
-get_messages(Connection) ->
-    get_messages(Connection, []).
-
-get_messages(#stomp_conn{socket = Socket} = Connection, Messages) ->
-    {ok, Response} = gen_tcp:recv(Socket, 0),
-    get_messages(Connection, Messages, Response).
-
-get_messages(_, Messages, []) ->
-    Messages;
-get_messages(Connection, Messages, Response) ->
-    [{type, Type},
-     {headers, Headers},
-     {body, MessageBody}, TheRest] = get_message(Response),
-    [_|T] = TheRest, %% U.G.L.Y.... you ain't got no alibi.
-    get_messages(Connection, [Messages, [[{type, Type}, {headers, Headers},
-                                          {body, MessageBody}]]], T).
+get_messages(#stomp_conn{socket = Socket} = Conn) ->
+    {ok, Chars} = gen_tcp:recv(Socket, 0),
+    get_messages(append_chars(Conn, Chars), []).
 
 %% @doc On message retrieval execute a function
 %%
@@ -232,124 +219,50 @@ abort_transaction(#stomp_conn{socket = Socket}, TransactionId) ->
 concatenate_options(Options) ->
     [[<<"\n">>, Name, <<": ">>, Value] || {Name, Value} <- Options].
 
-% MESSAGE PARSING... get's a little ugly in here...
-% would help if I truly grokked Erlang, I suspect.
-% 7/12/09 - yeah, ugly indeed, i need to make this use the same pattern
-% as get_headers_from_raw_src...
-% currently scanning header block multiple times and making unnecessary copies
-get_message(Message) ->
-    [Type,
-     {Headers, MessageBody}, TheRest] = get_type(Message), %% Ugly...
-    {ParsedHeaders, _} = get_headers_from_raw_src([], Headers),
-    [{type, Type}, {headers, ParsedHeaders}, {body, MessageBody}, TheRest].
-
-%% extract message body
-get_message_body([H|T]) ->
-    get_message_body([H|T], []).
-
-get_message_body([H|T], MessageBody) ->
-    case H of
-        0 ->
-            {MessageBody, T};
-        _ ->
-            {MyMessageBody, TheRest} = get_message_body(T, MessageBody),
-            {[MessageBody, [H], MyMessageBody], TheRest}
-    end.
-
-%% extract headers as a blob of chars, after having iterated over...
-get_headers(Message) ->
-    get_headers(Message, []).
-
-get_headers(Message, Headers) ->
-    get_headers(Message, Headers, -1).
-get_headers([H|T], Headers, LastChar) ->
-    case {H, LastChar} of
-        {10, 10} ->
-            {MessageBody, TheRest} = get_message_body(T),
-            [{Headers, MessageBody}, TheRest];
-        {_, _} ->
-            get_headers(T, [Headers, [H]], H)
-    end.
-
-%% extract type("MESSAGE", "CONNECT", etc.) from message string...
-get_type(Message) ->
-    get_type(Message, []).
-
-get_type([], Type) ->
-    Type;
-get_type([H|T], Type) ->
-    case H of
-        10 ->
-            [{Headers, MessageBody}, TheRest] = get_headers(T),
-            [Type, {Headers, MessageBody}, TheRest];
-        _ ->
-            get_type(T, [Type, [H]])
-    end.
-
-%% parse header clob into list of tuples...
-get_headers_from_raw_src(Headers, []) ->
-    {Headers, []};
-get_headers_from_raw_src(Headers, RawSrc) ->
-    {Header, RestOfList} = get_header(RawSrc),
-    get_headers_from_raw_src([Headers, [Header]], RestOfList).
-
-get_header(RawSrc) ->
-    {HeaderName, RestOfListAfterHeaderExtraction} =
-    get_header_name([], RawSrc),
-    {HeaderValue, RestOfListAfterValueExtraction} =
-    get_header_value([], RestOfListAfterHeaderExtraction),
-    {{HeaderName, HeaderValue}, RestOfListAfterValueExtraction}.
-
-get_header_name(HeaderName, [H|T]) ->
-    case H of
-        58 ->
-            {HeaderName, T};
-        _ ->
-            get_header_name([HeaderName, [H]], T)
-    end.
-
-get_header_value(HeaderValue, [H|T]) ->
-    case H of
-        10 ->
-            {HeaderValue, T};
-        _ ->
-            get_header_value([HeaderValue, [H]], T)
-    end.
-
 %%
 %% New message parsing
 %% (see http://stomp.github.io/stomp-specification-1.2.html)
 %%
 
-parse_messages(Conn) ->
-    case get_tokens(Conn) of
+get_messages(Conn, AccMessages) ->
+    case scan_tokens(Conn) of
         {eof, NewConn} ->
-            {[], NewConn};
+            {lists:reverse(AccMessages), NewConn};
+        {more, NewConn} ->
+            {lists:reverse(AccMessages), NewConn};
         {Tokens, NewConn} ->
-            {ok, Messages} = stomp_parser:parse(Tokens),
-            {Messages, NewConn}
+            {ok, [Message]} = stomp_parser:parse(Tokens),
+            get_messages(NewConn, [Message|AccMessages])
     end.
 
-get_tokens(#stomp_conn{chars = Chars} = Conn) ->
-    more_tokens(clear_chars(Conn),
-                stomp_lexer:tokens([], Chars)).
-
-get_tokens(Cont, Chars, Conn) ->
-    more_tokens(clear_chars(Conn),
+scan_tokens(#stomp_conn{cont = Cont, chars = Chars} = Conn) ->
+    more_tokens(set(Conn, [{#stomp_conn.chars, []},
+                           {#stomp_conn.cont, []}]),
                 stomp_lexer:tokens(Cont, Chars)).
 
-more_tokens(#stomp_conn{socket = Socket} = Conn, {more, Cont}) ->
-    {ok, Chars} = gen_tcp:recv(Socket, 0),
-    get_tokens(Cont, Chars, Conn);
+more_tokens(Conn, {more, Cont}) ->
+    {more, set(Conn, [{#stomp_conn.chars, []},
+                      {#stomp_conn.cont, Cont}])};
 more_tokens(Conn, {done, {ok, Tokens, _}, RestChars}) ->
-    {Tokens, set_chars(Conn, RestChars)};
+    {Tokens, set(Conn, [{#stomp_conn.chars, RestChars},
+                        {#stomp_conn.cont, []}])};
 more_tokens(Conn, {done, {eof, _}, RestChars}) ->
-    {eof, set_chars(Conn, RestChars)};
+    {eof, set(Conn, [{#stomp_conn.chars, RestChars},
+                     {#stomp_conn.cont, []}])};
 more_tokens(Conn, {done, ErrorInfo, RestChars}) ->
-    error({ErrorInfo, set_chars(Conn, RestChars)}).
+    error({ErrorInfo, Conn, RestChars}).
+
+append_chars(#stomp_conn{chars = Chars} = Conn, MoreChars) ->
+    set_chars(Conn, Chars ++ MoreChars).
 
 set_chars(#stomp_conn{} = Conn, Chars) ->
     Conn#stomp_conn{chars = Chars}.
 
-clear_chars(#stomp_conn{} = Conn) ->
-    set_chars(Conn, []).
+%% @doc Set `Fields' of the `Record' to `Values',
+%%      where `{Field, Value} <- FieldValues' (in list comprehension syntax).
+%% @end
+set(Record, FieldValues) ->
+    F = fun({Field, Value}, Rec) ->
+                setelement(Field, Rec, Value)
+        end,
+    lists:foldl(F, Record, FieldValues).
