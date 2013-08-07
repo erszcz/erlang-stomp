@@ -187,7 +187,7 @@ get_messages(Connection, Messages, Response) ->
 %% @end
 on_message(F, Conn) ->
     Messages = get_messages(Conn),
-    apply_function_to_messages(F, Messages),
+    lists:foreach(F, Messages),
     on_message(F, Conn).
 
 %% @doc Begin a transaction
@@ -225,18 +225,12 @@ abort_transaction(#stomp_conn{socket = Socket}, TransactionId) ->
     gen_tcp:send(Socket, Message),
     ok.
 
-%% PRIVATE METHODS...
-concatenate_options([]) ->
-    [];
-concatenate_options([H|T]) ->
-    {Name, Value} = H,
-    ["\n", Name, ": ", Value, concatenate_options(T)].
+%%
+%% Helpers
+%%
 
-apply_function_to_messages(_, []) ->
-    ok;
-apply_function_to_messages(F, [H|T]) ->
-    F(H),
-    apply_function_to_messages(F, T).
+concatenate_options(Options) ->
+    [[<<"\n">>, Name, <<": ">>, Value] || {Name, Value} <- Options].
 
 % MESSAGE PARSING... get's a little ugly in here...
 % would help if I truly grokked Erlang, I suspect.
