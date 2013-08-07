@@ -7,7 +7,7 @@ Terminals
 Rootsymbol frame_stream.
 
 frame_stream -> frame frame_stream : strip_eol_frame('$1', '$2').
-frame_stream -> frame : ['$1'].
+frame_stream -> frame : strip_eol_frame('$1', []).
 
 frame -> command eol
          headers eol
@@ -35,8 +35,6 @@ Erlang code.
 
 strip_eol_frame([], Frames) ->
     Frames;
-strip_eol_frame(Frame, [[]]) ->
-    [Frame];
 strip_eol_frame(Frame, Frames) ->
     [Frame | Frames].
 
