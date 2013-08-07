@@ -30,7 +30,7 @@
 
 -include("stomp.hrl").
 
-%% @doc Connect to a STOMP server and return a connection socket
+%% @doc Connect to a STOMP server and return a `#stomp_conn{}'
 %%
 %% Example: Conn = stomp:connect("localhost", 61613, "", "").
 %%
@@ -63,7 +63,7 @@ subscribe(Destination, Connection) ->
 %% Example: stomp:subscribe("/queue/foobar", Conn, [{"ack", "client"}]).
 %% Example: stomp:subscribe("/queue/foobar", Conn,
 %%                          [{"ack", "client"},
-%%                           {"activemq.prefetchSize", 1}]).
+%%                           {"activemq.prefetchSize", "1"}]).
 %%
 %% @end
 subscribe(Destination, #stomp_conn{socket = Socket}, Options) ->
