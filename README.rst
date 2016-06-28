@@ -1,3 +1,13 @@
+Disclaimer
+==========
+
+This is an approach to rewrite the STOMP protocol library
+using Erlang `leex <http://erlang.org/doc/man/leex.html>`_
+and `yecc <http://erlang.org/doc/man/yecc.html>`_ for parsing.
+I excavated it from a past project and archived here.
+
+**It's not usable as is - STOMP parsing is incomplete!**
+
 About
 =====
 
